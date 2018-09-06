@@ -131,7 +131,7 @@ change()   {
 
 
 xiao=$(dirname $0)
-busybox=${xiao%/*}/tools/busybox
+busybox=${xiao%/*}/bin/busybox
 cd $xiao
 busybox
 main
