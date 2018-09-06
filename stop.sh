@@ -1,3 +1,3 @@
 #!/system/bin/sh
 cd "${0%/*}"
-./*/core OFF 2>/dev/null
+./bin/core OFF 2>/dev/null
