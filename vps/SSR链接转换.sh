@@ -60,8 +60,6 @@ getvpsip_ping_wget()   {
         checkip=$(echo "$isip" | ${bgrep} '\([0-9]\{1,3\}\.\)\{3\}[0-9]\{1,3\}')
         if [ "$isip" != "" -a "$isip" = "$checkip" ];then
             ip=$isip
-        else
-            ip=$(${bwget} -q -T2 -O- http://119.29.29.29/d?dn=$ip | ${bcut} -d';' -f1)
         fi
     fi
 }
