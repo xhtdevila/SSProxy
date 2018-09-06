@@ -236,11 +236,21 @@ fi
 #↓删除生成文件
 ${brm} ./bin/*.conf >/dev/null 2>&1
 #检查核心
-echo "\n\n"
+echo ""
 for x in gost pdnsd ss-local redsocks2;do
     if [ "`pgrep $x`" != "" ];then
-        echo "  ✔  $x"
+        echo "✔ $x"
     else
-        echo "  ✘  $x"
+        echo "✘ $x"
     fi
 done
+echo ""
+echo "→ nat ←"
+iptables -t nat -S OUTPUT
+echo ""
+iptables -t nat -S PREROUTING
+echo "\n"
+echo "→ mangle ←"
+iptables -t mangle -S OUTPUT
+echo ""
+iptables -t mangle -S PREROUTING
