@@ -237,7 +237,7 @@ fi
 ${brm} ./bin/*.conf >/dev/null 2>&1
 #检查核心
 echo ""
-for x in gost pdnsd ss-local redsocks2;do
+for x in redsocks2 gost pdnsd ss-local;do
     if [ "`pgrep $x`" != "" ];then
         echo "✔ $x"
     else
