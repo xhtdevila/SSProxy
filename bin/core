@@ -249,7 +249,7 @@ echo "→ nat ←"
 iptables -t nat -S OUTPUT
 echo ""
 iptables -t nat -S PREROUTING
-echo "\n"
+echo ""
 echo "→ mangle ←"
 iptables -t mangle -S OUTPUT
 echo ""
