@@ -1,0 +1,252 @@
+#!/system/bin/sh
+#路径获取
+xiao=$(dirname $0)
+busybox=$xiao/bin/busybox
+cd $xiao
+cd ../
+. ./setting.ini
+
+
+
+#↓获取busybox
+busybox='find xargs rm chmod nohup ip pkill grep cut ls'
+for x in $busybox;do
+    type $x 2>&- >&-
+    if [ "$?" = "0" ];then
+        eval b$x=$x
+    else
+        eval b$x=\"$busybox $x\"
+    fi
+done
+#↓获取应用UID
+getuid() {
+    bm=$(echo $1 | ${bgrep} -i '[a-z]')
+    if [ "$bm" != "" ];then
+        re=$(${bgrep} -m1 -i "$1" /data/system/packages.list | ${bcut} -d' ' -f2)
+    else
+        re=$1
+    fi
+}
+#↓删除备份/获取权限
+${bfind} . -name "*.bak"  | ${bxargs} ${brm} -f >/dev/null 2>&1
+${bchmod} -R 777 * >/dev/null 2>&1
+
+
+
+if [ "$1" = "OFF" ];then
+    #↓关闭网络
+    if [ "$WLI" = "1" ];then
+        ${bnohup} svc data disable >/dev/null &
+        sleep 0.2
+    fi
+    #↓关闭核心
+    allapp='gost redsocks2 ss-local pdnsd'
+    for x in $allapp;do
+        ${bpkill} $x
+    done
+    #↓iptables规则关闭
+    ${bip} rule del fwmark 0x6688 table 121 > /dev/null 2>&1
+    ${bip} route del local 0.0.0.0/0 dev lo table 121 > /dev/null 2>&1
+    iptables -t nat -F OUTPUT
+    iptables -t nat -F PREROUTING
+    iptables -t mangle -P OUTPUT ACCEPT
+    iptables -t mangle -F OUTPUT
+    iptables -t mangle -F PREROUTING
+fi
+
+
+
+
+if [ "$2" = "ON" ];then
+    if [ "$vpsconf" != "" ];then
+        for x in $(${bls} ./vps) mark;do
+            filename=${x%.*}
+            if [ "$filename" = "$vpsconf" -o "$x" = "$vpsconf" ];then
+                . ./vps/$x
+                break
+            elif [ "$x" = "mark" ];then
+                echo "\n\n\n\n →_→ 未找到 $vpsconf 文件 ←_←"
+                exit 0
+            fi
+        done
+    fi
+    #↓建立pdnsd.conf文件
+    echo "
+    global {
+        perm_cache = 2048;
+        cache_dir=\"/etc\";
+        server_ip = 0.0.0.0;
+        server_port = 1053;
+        query_method = tcp_only;
+        run_ipv4 = on;
+        min_ttl = 15m;
+        max_ttl = 1w;
+        timeout = 10;
+        daemon = off;
+    }
+    server {
+        label = \"ss-local\";
+        ip = $dns;
+        port = 53;
+        reject_policy = negate;
+        reject_recursively = on;
+        timeout = 5;
+    }
+    rr {
+        name=localhost;
+        reverse=on;
+        a=127.0.0.1;
+        owner=localhost;
+        soa=localhost,root.localhost,42,86400,900,86400,86400;
+    }" > bin/pdnsd.conf
+    #↓建立redsocks2.conf文件
+    echo "
+    base {
+        log_debug = off;
+        log_info = off;
+        log = stderr;
+        daemon = on;
+        redirector = iptables;
+    }
+    redsocks {
+        local_ip = 0.0.0.0;
+        local_port = 1080;
+        ip = 127.0.0.1;
+        port = 1081;
+        type = socks5;
+    }
+    redudp {
+        local_ip = 0.0.0.0;
+        local_port = 1088;
+        ip = 127.0.0.1;
+        port = 1082;
+        type = socks5;
+        udp_timeout = 20;
+    }" > bin/redsocks2.conf
+    #↓建立ss-local.conf文件
+    echo "
+    {
+        \"server\": \"$ip\",
+        \"server_port\": \"$port\",
+        \"local_port\": 1081,
+        \"password\": \"$password\",
+        \"method\":\"$method\",
+        \"timeout\": 600,
+        \"protocol\": \"$protocol\",
+        \"obfs\": \"$obfs\",
+        \"obfs_param\": \"$host\",
+        \"protocol_param\": \"$protocol_param\"
+    }" > bin/ss-local.conf
+    #↓建立gost.conf文件
+    echo "
+    {
+        \"ServeNodes\": [
+            \"socks://127.0.0.1:1082\"
+        ],
+        \"ChainNodes\": [
+            \"socks://127.0.0.1:1081\",
+            \"socks://supppig:${gostpwd}@${gostip}:${udpport}\"
+        ]
+    }" > bin/gost.conf
+    ${bchmod} -R 777 ./bin/*.conf >/dev/null 2>&1
+
+    #↓UDP代理
+    if [ "$UDP" = "1" ];then
+        ${bip} rule add fwmark 0x6688 table 121
+        ${bip} route add local 0.0.0.0/0 dev lo table 121
+        iptables -t mangle -I OUTPUT -p udp -j MARK --set-mark 0x6688
+        iptables -t mangle -I PREROUTING -p udp -j TPROXY --on-port 1088 --tproxy-mark 0x6688
+        for x in 0/8 127/8 10/8 172.16/12 192.168/16 100.64/10 169.254/16 224/3;do
+            iptables -t mangle -I PREROUTING -d $x -j ACCEPT
+        done
+        */redsocks2 -c */redsocks2.conf &
+        */gost -C */gost.conf &
+    else
+        iptables -t nat -I OUTPUT -p udp -j REDIRECT --to-ports 2018
+    fi
+    #↓添加iptables链
+    iptables -t nat -I OUTPUT -p udp --dport 53 -j REDIRECT --to 1053
+    iptables -t nat -I OUTPUT -p tcp -m owner ! --uid-owner 3004 -j REDIRECT --to 1080
+    iptables -t nat -I OUTPUT -o lo -j ACCEPT
+    iptables -t mangle -I OUTPUT -p udp --dport 53 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    iptables -t mangle -I OUTPUT ! -p udp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+    */pdnsd -c */pdnsd.conf >/dev/null &
+    */ss-local -a 3004 -c */ss-local.conf --acl */Adblock-Bvc.acl >/dev/null &
+
+    #↓TCP放行
+    if [ "$TCP_FX" != "" ];then
+        for x in $TCP_FX;do
+            getuid $x
+            if [ "$re" != "" ];then
+                iptables -t nat -I OUTPUT -m owner --uid $re -p 6 -j ACCEPT
+                iptables -t mangle -I OUTPUT -m owner --uid $re -p 6 -j ACCEPT
+            fi
+        done
+    fi
+    #↓TCP禁网
+    if [ "$TCP_JW" != "" ];then
+        for x in $TCP_JW;do
+            getuid $x
+            if [ "$re" != "" ];then
+                iptables -t nat -I OUTPUT -m owner --uid $re -p 6 -j DROP
+                iptables -t mangle -I OUTPUT -m owner --uid $re -p 6 -j DROP
+            fi
+        done
+    fi
+    #↓UDP放行
+    if [ "$UDP_FX" != "" ];then
+        for x in $UDP_FX;do
+            getuid $x
+            if [ "$re" != "" ];then
+                iptables -t nat -I OUTPUT -m owner --uid $re -p 17 -j ACCEPT
+                iptables -t mangle -I OUTPUT -m owner --uid $re -p 17 -j ACCEPT
+            fi
+        done
+    fi
+    #↓UDP禁网
+    if [ "$UDP_JW" != "" ];then
+        for x in $UDP_JW;do
+            getuid $x
+            if [ "$re" != "" ];then
+                iptables -t nat -I OUTPUT -m owner --uid $re -p 17 -j ACCEPT
+                iptables -t mangle -I OUTPUT -m owner --uid $re -p 17 -j ACCEPT
+            fi
+        done
+    fi
+    #↓网卡放行
+    if [ "$NC_FX" != "" ];then
+        for x in $NC_FX;do
+            iptables -t nat -I OUTPUT -o $x -j ACCEPT
+            iptables -t mangle -I OUTPUT -o $x -j ACCEPT
+        done
+    fi
+    #↓热点代理
+    if [ "$HOT" = "1" ];then
+        iptables -t nat -I PREROUTING -p 17 --dport 53 -j REDIRECT --to-ports 1053
+        iptables -t nat -I PREROUTING -s 192.168/16 -p 6 -j REDIRECT --to-ports 1080
+    fi
+    #↓WIFI代理
+    if [ "$WIF" != "1" ];then
+        iptables -t nat -I OUTPUT -o wlan+ -j ACCEPT
+        iptables -t mangle -I OUTPUT -o wlan+ -j ACCEPT
+    fi
+
+    #↓开启网络
+    if [ "$WLI" = "1" ];then
+        ${bnohup} svc data enable >/dev/null &
+    fi
+fi
+
+
+
+#↓删除生成文件
+${brm} ./bin/*.conf >/dev/null 2>&1
+#检查核心
+echo "\n\n"
+for x in gost pdnsd ss-local redsocks2;do
+    if [ "`pgrep $x`" != "" ];then
+        echo "  ✔  $x"
+    else
+        echo "  ✘  $x"
+    fi
+done
