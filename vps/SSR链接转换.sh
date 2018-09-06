@@ -108,7 +108,7 @@ main()   {
         [ "$h" = "" ] && continue
         echo "\n\n找到待转换文件$x..."
         ff="y"
-        link_conversion $h
+        link_conversion $h >/dev/null 2>&1
         getvpsip_ping_wget
         makeconf $x
         h=$(head -1 $x | ${bgrep} '^ssr://')
