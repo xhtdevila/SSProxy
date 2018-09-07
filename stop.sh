@@ -1,3 +1,6 @@
 #!/system/bin/sh
-cd "${0%/*}"
-./bin/core OFF 2>/dev/null
+xiao="${0%/*}"
+cd $xiao
+./start.sh stop
+
+
