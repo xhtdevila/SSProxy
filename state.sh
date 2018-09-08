@@ -5,27 +5,32 @@ cd $xiao
 
 
 
-#↓获取busybox
-busybox="find xargs rm chmod pgrep"
-for x in $busybox;do
-    type $x 2>&- >&-
-    if [ "$?" = "0" ];then
-        eval b$x=$x
-    else
-        eval b$x=\"$box $x\"
+#↓删除备份/获取权限
+$box find . -name "*.bak"  | $box xargs $box rm -f >/dev/null 2>&1
+$box chmod -R 777 * >/dev/null 2>&1
+#↓总流量：上传/下载
+for x in `$box cat /data/misc/net/rt_tables`;do
+    if [[ `$box ip addr | $box grep "/" | $box grep -i $x` != "" ]];then
+        SWK=`$box ifconfig $x` 2>/dev/null
     fi
 done
-#↓删除备份/获取权限
-${bfind} . -name "*.bak"  | ${bxargs} ${brm} -f >/dev/null 2>&1
-${bchmod} -R 777 * >/dev/null 2>&1
-#↓检测脚本
+TX=`echo "${SWK#*TX bytes:}" | $box sed 's/\([^(]*(\)\([^)]*\)\(.*\)/\2/;s/i.*//g'`
+RX=`echo "${SWK#*RX bytes:}" | $box sed 's/\([^(]*(\)\([^)]*\)\(.*\)/\2/;s/i.*//g'`
+#↓热点流量：上传/下载
+source /data/misc/wifi/hostapd.conf >/dev/null 2>&1
+RWK=`$box ifconfig $interface` >/dev/null 2>&1
+TX1=`echo ${RWK#*TX bytes} | $box cut -d "(" -f 2 | $box cut -d ")" -f 1 | $box cut -d "i" -f 1`
+RX1=`echo ${RWK#*RX bytes} | $box cut -d "(" -f 2 | $box cut -d ")" -f 1 | $box cut -d "i" -f 1`
+#↓显示输出
 echo ""
 for x in redsocks2 gost pdnsd ss-local;do
-    if [ "`${bpgrep} $x`" != "" ];then
-        echo "✔ $x"
-    else
-        echo "✘ $x"
-    fi
+    [ "`$box pgrep $x`" != "" ] && A="✔" || A="✘"
+    [ "$x" = "gost" -a "$TX" != "" ] && B="▲$TX" 
+    [ "$x" = "gost" -a "$RX1" != "0.0 B" ] && C="▲$TX1" 
+    [ "$x" = "pdnsd" -a "$RX" != "" ] && B="▼$RX"
+    [ "$x" = "pdnsd" -a "$RX1" != "0.0 B" ] && C="▼$RX1"
+    printf "%-4s%-13s%-15s%s\n" "$A" "$x" "$B" "$C"
+    A="";B="";C=""
 done
 echo ""
 echo "→ nat ←"

@@ -6,21 +6,11 @@ cd $xiao
 
 
 
-#↓获取busybox
-busybox="grep cut find xargs rm nohup pkill ip ls chmod"
-for x in $busybox;do
-    type $x 2>&- >&-
-    if [ "$?" = "0" ];then
-        eval b$x=$x
-    else
-        eval b$x=\"$box $x\"
-    fi
-done
 #↓获取应用UID
 getuid() {
-    bm=$(echo $1 | ${bgrep} -i '[a-z]')
+    bm=$(echo $1 | $box grep -i '[a-z]')
     if [ "$bm" != "" ];then
-        re=$(${bgrep} -m1 -i "$1" /data/system/packages.list | ${bcut} -d' ' -f2)
+        re=$($box grep -m1 -i "$1" /data/system/packages.list | $box cut -d' ' -f2)
     else
         re=$1
     fi
@@ -29,18 +19,18 @@ getuid() {
 
 
 #↓删除备份/获取权限
-${bfind} . -name "*.bak"  | ${bxargs} ${brm} -f >/dev/null 2>&1
-${bchmod} -R 777 * >/dev/null 2>&1
+$box find . -name "*.bak"  | $box xargs $box rm -f >/dev/null 2>&1
+$box chmod -R 777 * >/dev/null 2>&1
 #↓关闭网络
 [ "$WLI" = "1" ] && svc data disable >/dev/null 2>&1
 #↓关闭核心
 allapp='redsocks2 gost pdnsd ss-local'
 for x in $allapp;do
-    ${bpkill} $x
+    $box pkill $x
 done
 #↓iptables规则关闭
-${bip} rule del fwmark 0x6688 table 121 > /dev/null 2>&1
-${bip} route del local 0.0.0.0/0 dev lo table 121 > /dev/null 2>&1
+$box ip rule del fwmark 0x6688 table 121 > /dev/null 2>&1
+$box ip route del local 0.0.0.0/0 dev lo table 121 > /dev/null 2>&1
 iptables -t nat -F OUTPUT
 iptables -t nat -F PREROUTING
 iptables -t mangle -P OUTPUT ACCEPT
@@ -56,7 +46,7 @@ fi
 
 #↓获取SSR文件
 if [ "$vpsconf" != "" ];then
-    for x in $(${bls} ./vps) mark;do
+    for x in $($box ls ./vps) mark;do
         filename=${x%.*}
         if [ "$filename" = "$vpsconf" -o "$x" = "$vpsconf" ];then
              . ./vps/$x
@@ -145,27 +135,29 @@ echo "
         \"socks://supppig:$gostpwd@$gostip:$udpport\"
     ]
 }" > bin/gost.conf
-${bchmod} -R 777 ./bin/*.conf >/dev/null 2>&1
+$box chmod -R 777 ./bin/*.conf >/dev/null 2>&1
 
 
 
-#↓UDP代理
-${bip} rule add fwmark 0x6688 table 121
-${bip} route add local 0.0.0.0/0 dev lo table 121
+#↓添加iptables链
 iptables -t mangle -I OUTPUT -p udp -j MARK --set-mark 0x6688
 iptables -t mangle -I PREROUTING -p udp -j TPROXY --on-port 1088 --tproxy-mark 0x6688
 for x in 0/8 127/8 10/8 172.16/12 192.168/16 100.64/10 169.254/16 224/3;do
     iptables -t mangle -I PREROUTING -d $x -j ACCEPT
 done
-${bnohup} ./bin/redsocks2 -c ./bin/redsocks2.conf >/dev/null &
-${bnohup} ./bin/gost -C ./bin/gost.conf >/dev/null &
-#↓添加iptables链
 iptables -t nat -I OUTPUT -p udp --dport 53 -j REDIRECT --to 1053
 iptables -t nat -I OUTPUT -p tcp -m owner ! --uid-owner 3004 -j REDIRECT --to 1080
 iptables -t mangle -I OUTPUT -p udp --dport 53 -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
 iptables -t mangle -I OUTPUT ! -p udp -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
-${bnohup} ./bin/pdnsd -c ./bin/pdnsd.conf >/dev/null &
-${bnohup} ./bin/ss-local -a 3004 -c ./bin/ss-local.conf --acl ./bin/*.acl >/dev/null &
+iptables -t nat -I PREROUTING -p 17 --dport 53 -j REDIRECT --to-ports 1053
+iptables -t nat -I PREROUTING -s 192.168/16 -p 6 -j REDIRECT --to-ports 1080
+$box ip rule add fwmark 0x6688 table 121
+$box ip route add local 0.0.0.0/0 dev lo table 121
+#↓启动核心
+$box nohup ./bin/redsocks2 -c ./bin/redsocks2.conf >/dev/null &
+$box nohup ./bin/gost -C ./bin/gost.conf >/dev/null &
+$box nohup ./bin/pdnsd -c ./bin/pdnsd.conf >/dev/null &
+$box nohup ./bin/ss-local -a 3004 -c ./bin/ss-local.conf --acl ./bin/*.acl >/dev/null &
 #↓TCP放行
 if [ "$TCP_FX" != "" ];then
     for x in $TCP_FX;do
@@ -202,11 +194,6 @@ if [ "$NC_FX" != "" ];then
         iptables -t mangle -I OUTPUT -o $x -j ACCEPT
     done
 fi
-#↓热点代理
-if [ "$HOT" = "1" ];then
-    iptables -t nat -I PREROUTING -p 17 --dport 53 -j REDIRECT --to-ports 1053
-    iptables -t nat -I PREROUTING -s 192.168/16 -p 6 -j REDIRECT --to-ports 1080
-fi
 #↓WIFI代理
 if [ "$WIF" != "1" ];then
     iptables -t nat -I OUTPUT -o wlan+ -j ACCEPT
@@ -216,9 +203,9 @@ fi
 
 
 #↓删除生成文件
-${brm} ./bin/*.conf >/dev/null 2>&1
+$box rm ./bin/*.conf >/dev/null 2>&1
 #↓开启网络
-[ "$WLI" = "1" ] && ${bnohup} svc data enable >/dev/null &
+[ "$WLI" = "1" ] && nohup svc data enable >/dev/null &
 #↓检测脚本
 ./state.sh
 
