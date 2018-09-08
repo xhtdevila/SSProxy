@@ -24,12 +24,12 @@ RX1=`echo ${RWK#*RX bytes} | $box cut -d "(" -f 2 | $box cut -d ")" -f 1 | $box 
 #↓显示输出
 echo ""
 for x in redsocks2 gost pdnsd ss-local;do
-    [ "`$box pgrep $x`" != "" ] && A="✔" || A="✘"
+    [ "`$box pgrep $x`" != "" ] && A=" ✔" || A=" ✘"
     [ "$x" = "gost" -a "$TX" != "" ] && B="▲$TX" 
     [ "$x" = "gost" -a "$RX1" != "0.0 B" ] && C="▲$TX1" 
     [ "$x" = "pdnsd" -a "$RX" != "" ] && B="▼$RX"
     [ "$x" = "pdnsd" -a "$RX1" != "0.0 B" ] && C="▼$RX1"
-    printf "%-4s%-13s%-15s%s\n" "$A" "$x" "$B" "$C"
+    printf "%-5s%-13s%-15s%s\n" "$A" "$x" "$B" "$C"
     A="";B="";C=""
 done
 echo ""
