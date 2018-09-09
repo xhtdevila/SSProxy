@@ -22,23 +22,23 @@ Host='ltetp.tv189.com\\r\\nPort'
 
 link_conversion()   {
     label='';ip='';port='';password='';method='';protocol='';obfs='';protocol_param='';host='';remarks='';group=''
-    allstr=$(echo -n $1 | $box cut -d'/' -f3 | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
+    allstr=$(echo -n $1 | $box cut -d'/' -f3 | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
     fstr=$(echo -n $allstr | $box cut -d'/' -f1)
     #获取IP,端口,密码,加密方式,协议,混淆方式,协议参数
     ip=$(echo -n $fstr | $box cut -d':' -f1)
     port=$(echo -n $fstr | $box cut -d':' -f2)
-    password=$(echo -n $fstr | $box cut -d':' -f6 | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
+    password=$(echo -n $fstr | $box cut -d':' -f6 | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
     method=$(echo -n $fstr | $box cut -d':' -f4)
     protocol=$(echo -n $fstr | $box cut -d':' -f3)
     obfs=$(echo -n $fstr | $box cut -d':' -f5)
-    protocol_param=$(echo -n $protoparam | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
+    protocol_param=$(echo -n $protoparam | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
     #获取混淆参数
     eval $(echo -n $allstr | $box cut -d'?' -f2 | $box sed s/'&'/';'/g)
-    host=$(echo -n $obfsparam | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
+    host=$(echo -n $obfsparam | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
     [ "$Host" != "" ] && host=$Host
     #获取配置名称
-    remarks=$(echo -n $remarks | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
-    group=$(echo -n $group | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | $box base64 -d 2>&-)
+    remarks=$(echo -n $remarks | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
+    group=$(echo -n $group | $box sed s#'-'#'+'#g | $box sed s#'_'#'/'#g | base64 -d 2>&-)
     [ "$group" = "" ] && label=$remarks || label=$group'-'$remarks
     [ "$label" = "" ] && label='自动转换'
 }
